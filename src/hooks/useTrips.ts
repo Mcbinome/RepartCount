@@ -121,6 +121,16 @@ export function useTrips() {
     [updateTrip],
   )
 
+  const replaceTrip = useCallback(
+    (tripId: string, replacement: Trip) => {
+      updateTrip(tripId, (t) => ({
+        ...replacement,
+        id: t.id,
+      }))
+    },
+    [updateTrip],
+  )
+
   return {
     trips,
     createTrip,
@@ -132,5 +142,6 @@ export function useTrips() {
     addExpense,
     updateExpense,
     removeExpense,
+    replaceTrip,
   }
 }

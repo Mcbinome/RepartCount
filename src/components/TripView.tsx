@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Expense, Participant, Trip } from '../types'
+import { downloadTripExport, parseTripImport } from '../lib/importExport'
 import { ParticipantsPanel } from './ParticipantsPanel'
 import { ExpensesPanel } from './ExpensesPanel'
 import { BalancesPanel } from './BalancesPanel'
@@ -16,6 +17,7 @@ interface Props {
   onAddExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => void
   onUpdateExpense: (id: string, patch: Partial<Expense>) => void
   onRemoveExpense: (id: string) => void
+  onReplaceTrip: (trip: Trip) => void
 }
 
 export function TripView({
@@ -28,12 +30,45 @@ export function TripView({
   onAddExpense,
   onUpdateExpense,
   onRemoveExpense,
+  onReplaceTrip,
 }: Props) {
   const [tab, setTab] = useState<Tab>(
     trip.participants.length === 0 ? 'people' : 'expenses',
   )
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(trip.name)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+
+  function handleExport() {
+    downloadTripExport(trip)
+    setError(null)
+    setNotice('Groupe exporté en fichier JSON local.')
+  }
+
+  async function handleImport(file: File | null) {
+    if (!file) return
+
+    try {
+      const contents = await file.text()
+      const importedTrip = parseTripImport(contents)
+      const confirmed = window.confirm(
+        `Remplacer le groupe actuel par le contenu de "${file.name}" ?`,
+      )
+      if (!confirmed) return
+      onReplaceTrip(importedTrip)
+      setError(null)
+      setNotice('Groupe réimporté depuis le fichier local.')
+    } catch (err) {
+      setNotice(null)
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible d'importer ce fichier.",
+      )
+    }
+  }
 
   return (
     <div className="page trip">
@@ -74,6 +109,40 @@ export function TripView({
         )}
         <p className="brand-mini">RepartCount</p>
       </header>
+
+      <section className="trip-tools">
+        <div>
+          <strong>Sauvegarde locale</strong>
+          <p>
+            Exportez ce groupe en fichier plat JSON, puis reimportez-le si besoin.
+          </p>
+        </div>
+        <div className="trip-tools-actions">
+          <button type="button" className="btn ghost" onClick={handleExport}>
+            Exporter
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => importInputRef.current?.click()}
+          >
+            Reimporter
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => {
+              void handleImport(e.target.files?.[0] ?? null)
+              e.currentTarget.value = ''
+            }}
+          />
+        </div>
+      </section>
+
+      {notice && <p className="inline-message success">{notice}</p>}
+      {error && <p className="inline-message error">{error}</p>}
 
       <nav className="tabs" aria-label="Sections">
         {(

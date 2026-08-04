@@ -16,6 +16,7 @@ export default function App() {
     addExpense,
     updateExpense,
     removeExpense,
+    replaceTrip,
   } = useTrips()
 
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export default function App() {
         onAddExpense={(expense) => addExpense(activeTrip.id, expense)}
         onUpdateExpense={(id, patch) => updateExpense(activeTrip.id, id, patch)}
         onRemoveExpense={(id) => removeExpense(activeTrip.id, id)}
+        onReplaceTrip={(trip) => replaceTrip(activeTrip.id, trip)}
       />
     )
   }
