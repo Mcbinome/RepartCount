@@ -15,6 +15,7 @@ export interface Expense {
   /**
    * Optional per-participant share overrides for this expense.
    * Missing entries fall back to the participant's defaultShares.
+   * A value of 0 means the person is not charged for this expense.
    */
   shares?: Record<string, number>
   createdAt: string

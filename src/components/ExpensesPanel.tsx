@@ -117,8 +117,12 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
           raw !== undefined && raw !== ''
             ? Number.parseFloat(raw.replace(',', '.'))
             : (person?.defaultShares ?? 1)
-        shares[id] = Number.isFinite(v) && v > 0 ? v : (person?.defaultShares ?? 1)
+        // 0 is allowed (not charged); negative / NaN fall back to default
+        shares[id] =
+          Number.isFinite(v) && v >= 0 ? v : (person?.defaultShares ?? 1)
       }
+      const totalShares = Object.values(shares).reduce((a, b) => a + b, 0)
+      if (totalShares <= 0) return null
     }
 
     return {
@@ -270,7 +274,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
                   <span>{p.name}</span>
                   <input
                     type="number"
-                    min="0.01"
+                    min="0"
                     step="any"
                     inputMode="decimal"
                     value={customShares[p.id] ?? String(p.defaultShares)}
@@ -283,6 +287,10 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
                   />
                 </label>
               ))}
+            <p className="share-hint">
+              Part à 0 = non concerné par cette dépense. Au moins une part doit
+              rester positive.
+            </p>
           </div>
         )}
 
@@ -290,7 +298,22 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
           <button
             type="submit"
             className="btn primary"
-            disabled={!title.trim() || !amount || selected.size === 0 || !paidBy}
+            disabled={
+              !title.trim() ||
+              !amount ||
+              selected.size === 0 ||
+              !paidBy ||
+              (useCustomShares &&
+                [...selected].every((id) => {
+                  const person = trip.participants.find((p) => p.id === id)
+                  const raw = customShares[id]
+                  const v =
+                    raw !== undefined && raw !== ''
+                      ? Number.parseFloat(raw.replace(',', '.'))
+                      : (person?.defaultShares ?? 1)
+                  return !Number.isFinite(v) || v <= 0
+                }))
+            }
           >
             {isEditing ? 'Enregistrer' : 'Ajouter la dépense'}
           </button>

@@ -10,8 +10,9 @@ function sharesForExpense(
   for (const id of expense.participantIds) {
     const override = expense.shares?.[id]
     const participant = byId.get(id)
+    // Explicit 0 means "not charged for this expense"
     const weight =
-      override !== undefined && override > 0
+      override !== undefined && Number.isFinite(override) && override >= 0
         ? override
         : (participant?.defaultShares ?? 1)
     result.set(id, Math.max(0, weight))

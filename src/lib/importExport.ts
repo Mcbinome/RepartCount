@@ -40,9 +40,16 @@ function isExpense(value: unknown): value is Expense {
   if (value.shares === undefined) return true
   if (!isRecord(value.shares)) return false
 
-  return Object.values(value.shares).every(
-    (share) => typeof share === 'number' && Number.isFinite(share) && share > 0,
-  )
+  const shareValues = Object.values(value.shares)
+  if (
+    !shareValues.every(
+      (share) => typeof share === 'number' && Number.isFinite(share) && share >= 0,
+    )
+  ) {
+    return false
+  }
+  // At least one positive share is required when overrides are set
+  return shareValues.some((share) => (share as number) > 0)
 }
 
 function validateTrip(trip: unknown): trip is Trip {

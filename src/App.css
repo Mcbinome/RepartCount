@@ -557,6 +557,14 @@
   border-radius: 14px;
 }
 
+.share-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
 .expense-list > li {
   border-top: 1px solid var(--line);
 }
