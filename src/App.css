@@ -449,6 +449,26 @@
   border-bottom: 1px solid var(--line);
 }
 
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.expense-list > li.editing {
+  background: rgba(15, 107, 92, 0.05);
+  border-radius: 12px;
+  margin-inline: -0.35rem;
+  padding-inline: 0.35rem;
+}
+
+.expense-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .who-fieldset {
   border: none;
   margin: 0;

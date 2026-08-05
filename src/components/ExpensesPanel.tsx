@@ -9,7 +9,9 @@ interface Props {
   onUpdate: (id: string, patch: Partial<Expense>) => void
 }
 
-export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
+type ExpenseDraft = Omit<Expense, 'id' | 'createdAt'>
+
+export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
   const [paidBy, setPaidBy] = useState(trip.participants[0]?.id ?? '')
@@ -19,7 +21,10 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
   const [customShares, setCustomShares] = useState<Record<string, string>>({})
   const [useCustomShares, setUseCustomShares] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const knownIds = useRef(new Set(trip.participants.map((p) => p.id)))
+  const formRef = useRef<HTMLFormElement | null>(null)
+  const isEditing = editingId !== null
 
   useEffect(() => {
     if (!trip.participants.find((p) => p.id === paidBy)) {
@@ -39,6 +44,51 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
     })
   }, [trip.participants])
 
+  // If the expense being edited was removed, exit edit mode
+  useEffect(() => {
+    if (editingId && !trip.expenses.some((e) => e.id === editingId)) {
+      resetForm()
+    }
+  }, [editingId, trip.expenses])
+
+  function resetForm() {
+    setTitle('')
+    setAmount('')
+    setPaidBy(trip.participants[0]?.id ?? '')
+    setSelected(new Set(trip.participants.map((p) => p.id)))
+    setCustomShares({})
+    setUseCustomShares(false)
+    setEditingId(null)
+  }
+
+  function startEdit(expense: Expense) {
+    setEditingId(expense.id)
+    setOpenId(null)
+    setTitle(expense.title)
+    setAmount(String(expense.amount).replace('.', ','))
+    setPaidBy(expense.paidBy)
+    setSelected(new Set(expense.participantIds))
+
+    const hasCustomShares = Boolean(expense.shares && Object.keys(expense.shares).length > 0)
+    setUseCustomShares(hasCustomShares)
+
+    if (hasCustomShares && expense.shares) {
+      const init: Record<string, string> = {}
+      for (const id of expense.participantIds) {
+        const share = expense.shares[id]
+        const person = trip.participants.find((p) => p.id === id)
+        init[id] = String(share ?? person?.defaultShares ?? 1)
+      }
+      setCustomShares(init)
+    } else {
+      setCustomShares({})
+    }
+
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
   function togglePerson(id: string) {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -52,11 +102,10 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
     setSelected(new Set(trip.participants.map((p) => p.id)))
   }
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  function buildDraft(): ExpenseDraft | null {
     const parsed = Number.parseFloat(amount.replace(',', '.'))
-    if (!title.trim() || !Number.isFinite(parsed) || parsed <= 0) return
-    if (!paidBy || selected.size === 0) return
+    if (!title.trim() || !Number.isFinite(parsed) || parsed <= 0) return null
+    if (!paidBy || selected.size === 0) return null
 
     let shares: Record<string, number> | undefined
     if (useCustomShares) {
@@ -64,26 +113,41 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
       for (const id of selected) {
         const raw = customShares[id]
         const person = trip.participants.find((p) => p.id === id)
-        const v = raw !== undefined && raw !== ''
-          ? Number.parseFloat(raw.replace(',', '.'))
-          : person?.defaultShares ?? 1
-        shares[id] = Number.isFinite(v) && v > 0 ? v : person?.defaultShares ?? 1
+        const v =
+          raw !== undefined && raw !== ''
+            ? Number.parseFloat(raw.replace(',', '.'))
+            : (person?.defaultShares ?? 1)
+        shares[id] = Number.isFinite(v) && v > 0 ? v : (person?.defaultShares ?? 1)
       }
     }
 
-    onAdd({
+    return {
       title: title.trim(),
       amount: Math.round(parsed * 100) / 100,
       paidBy,
       participantIds: [...selected],
       shares,
-    })
+    }
+  }
 
-    setTitle('')
-    setAmount('')
-    setCustomShares({})
-    setUseCustomShares(false)
-    setSelected(new Set(trip.participants.map((p) => p.id)))
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const draft = buildDraft()
+    if (!draft) return
+
+    if (editingId) {
+      onUpdate(editingId, {
+        title: draft.title,
+        amount: draft.amount,
+        paidBy: draft.paidBy,
+        participantIds: draft.participantIds,
+        shares: draft.shares,
+      })
+    } else {
+      onAdd(draft)
+    }
+
+    resetForm()
   }
 
   if (trip.participants.length === 0) {
@@ -100,14 +164,15 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
   return (
     <section className="panel">
       <div className="panel-head">
-        <h2>Dépenses</h2>
+        <h2>{isEditing ? 'Modifier la dépense' : 'Dépenses'}</h2>
         <p>
-          Choisissez qui a payé et qui partage. Vous pouvez ajuster les parts
-          pour une dépense précise.
+          {isEditing
+            ? 'Corrigez les infos, les personnes concernées ou les parts, puis enregistrez.'
+            : 'Choisissez qui a payé et qui partage. Vous pouvez ajuster les parts pour une dépense précise.'}
         </p>
       </div>
 
-      <form className="expense-form" onSubmit={handleSubmit}>
+      <form ref={formRef} className="expense-form" onSubmit={handleSubmit}>
         <div className="field-grid">
           <div className="field grow">
             <label htmlFor="e-title">Description</label>
@@ -164,7 +229,9 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
                   aria-pressed={active}
                 >
                   {p.name}
-                  <span className="chip-shares">{p.defaultShares} part{p.defaultShares !== 1 ? 's' : ''}</span>
+                  <span className="chip-shares">
+                    {p.defaultShares} part{p.defaultShares !== 1 ? 's' : ''}
+                  </span>
                 </button>
               )
             })}
@@ -182,7 +249,8 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
                   const init: Record<string, string> = {}
                   for (const p of trip.participants) {
                     if (selected.has(p.id)) {
-                      init[p.id] = String(p.defaultShares)
+                      init[p.id] =
+                        customShares[p.id] ?? String(p.defaultShares)
                     }
                   }
                   setCustomShares(init)
@@ -218,18 +286,20 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
           </div>
         )}
 
-        <button
-          type="submit"
-          className="btn primary"
-          disabled={
-            !title.trim() ||
-            !amount ||
-            selected.size === 0 ||
-            !paidBy
-          }
-        >
-          Ajouter la dépense
-        </button>
+        <div className="form-actions">
+          <button
+            type="submit"
+            className="btn primary"
+            disabled={!title.trim() || !amount || selected.size === 0 || !paidBy}
+          >
+            {isEditing ? 'Enregistrer' : 'Ajouter la dépense'}
+          </button>
+          {isEditing && (
+            <button type="button" className="btn ghost" onClick={resetForm}>
+              Annuler
+            </button>
+          )}
+        </div>
       </form>
 
       {trip.expenses.length === 0 ? (
@@ -238,16 +308,23 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
         <ul className="expense-list">
           {trip.expenses.map((expense) => {
             const open = openId === expense.id
+            const editing = editingId === expense.id
             const breakdown = expenseShareBreakdown(expense, trip.participants)
             return (
-              <li key={expense.id} className={open ? 'open' : ''}>
+              <li
+                key={expense.id}
+                className={`${open ? 'open' : ''} ${editing ? 'editing' : ''}`}
+              >
                 <button
                   type="button"
                   className="expense-row"
                   onClick={() => setOpenId(open ? null : expense.id)}
                 >
                   <div>
-                    <strong>{expense.title}</strong>
+                    <strong>
+                      {expense.title}
+                      {editing ? ' · en cours de modification' : ''}
+                    </strong>
                     <span className="meta">
                       Payé par {payer(expense.paidBy)} ·{' '}
                       {expense.participantIds.length} personne
@@ -272,13 +349,25 @@ export function ExpensesPanel({ trip, onAdd, onRemove }: Props) {
                         </li>
                       ))}
                     </ul>
-                    <button
-                      type="button"
-                      className="btn ghost danger"
-                      onClick={() => onRemove(expense.id)}
-                    >
-                      Supprimer
-                    </button>
+                    <div className="expense-detail-actions">
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => startEdit(expense)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost danger"
+                        onClick={() => {
+                          if (editingId === expense.id) resetForm()
+                          onRemove(expense.id)
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                 )}
               </li>

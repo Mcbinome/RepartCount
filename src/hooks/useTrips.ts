@@ -96,9 +96,15 @@ export function useTrips() {
     (tripId: string, expenseId: string, patch: Partial<Expense>) => {
       updateTrip(tripId, (t) => ({
         ...t,
-        expenses: t.expenses.map((e) =>
-          e.id === expenseId ? { ...e, ...patch } : e,
-        ),
+        expenses: t.expenses.map((e) => {
+          if (e.id !== expenseId) return e
+          const next = { ...e, ...patch }
+          // Allow clearing custom shares when switching back to defaults
+          if ('shares' in patch && patch.shares === undefined) {
+            delete next.shares
+          }
+          return next
+        }),
       }))
     },
     [updateTrip],
