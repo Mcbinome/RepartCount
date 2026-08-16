@@ -7,6 +7,9 @@ import './App.css'
 export default function App() {
   const {
     trips,
+    syncStatus,
+    syncError,
+    cloudEnabled,
     createTrip,
     deleteTrip,
     renameTrip,
@@ -17,6 +20,7 @@ export default function App() {
     updateExpense,
     removeExpense,
     replaceTrip,
+    refreshFromCloud,
   } = useTrips()
 
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -46,6 +50,10 @@ export default function App() {
   return (
     <TripList
       trips={trips}
+      syncStatus={syncStatus}
+      syncError={syncError}
+      cloudEnabled={cloudEnabled}
+      onRefresh={() => void refreshFromCloud()}
       onOpen={setActiveId}
       onCreate={(name) => {
         const id = createTrip(name)

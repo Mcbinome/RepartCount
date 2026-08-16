@@ -1,16 +1,46 @@
 import { useState, type FormEvent } from 'react'
 import type { Trip } from '../types'
+import type { SyncStatus } from '../hooks/useTrips'
 import { formatMoney } from '../lib/calculations'
 import { computeBalances } from '../lib/calculations'
 
 interface Props {
   trips: Trip[]
+  syncStatus: SyncStatus
+  syncError: string | null
+  cloudEnabled: boolean
   onOpen: (id: string) => void
   onCreate: (name: string) => void
   onDelete: (id: string) => void
+  onRefresh: () => void
 }
 
-export function TripList({ trips, onOpen, onCreate, onDelete }: Props) {
+function syncLabel(status: SyncStatus, cloudEnabled: boolean): string {
+  if (!cloudEnabled) return 'Cloud non configuré'
+  switch (status) {
+    case 'loading':
+      return 'Sync cloud…'
+    case 'synced':
+      return 'Synchronisé (Mongo Atlas)'
+    case 'error':
+      return 'Erreur de sync'
+    case 'offline':
+      return 'Hors ligne'
+    default:
+      return 'Cloud'
+  }
+}
+
+export function TripList({
+  trips,
+  syncStatus,
+  syncError,
+  cloudEnabled,
+  onOpen,
+  onCreate,
+  onDelete,
+  onRefresh,
+}: Props) {
   const [name, setName] = useState('')
 
   function handleSubmit(e: FormEvent) {
@@ -29,6 +59,22 @@ export function TripList({ trips, onOpen, onCreate, onDelete }: Props) {
           Créez un groupe, définissez les parts de chacun, ajoutez les dépenses.
           On s&apos;occupe du reste.
         </p>
+        <div className="sync-bar">
+          <span className={`sync-pill ${syncStatus}`}>
+            {syncLabel(syncStatus, cloudEnabled)}
+          </span>
+          {cloudEnabled && (
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onRefresh}
+              disabled={syncStatus === 'loading'}
+            >
+              Rafraîchir
+            </button>
+          )}
+        </div>
+        {syncError && <p className="inline-message error">{syncError}</p>}
       </header>
 
       <form className="create-trip" onSubmit={handleSubmit}>
