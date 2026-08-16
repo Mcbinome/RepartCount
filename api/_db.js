@@ -1,8 +1,8 @@
-const { MongoClient } = require('mongodb')
+import { MongoClient } from 'mongodb'
 
 let cachedClient = null
 
-async function getDb() {
+export async function getDb() {
   if (!process.env.MONGODB_URI) {
     throw new Error('MONGODB_URI is not configured')
   }
@@ -15,7 +15,7 @@ async function getDb() {
   return client.db(process.env.MONGODB_DATABASE || 'repartcount')
 }
 
-function checkApiKey(req) {
+export function checkApiKey(req) {
   const key = req.headers['x-api-key']
   if (!key || key !== process.env.API_KEY) {
     return false
@@ -23,7 +23,7 @@ function checkApiKey(req) {
   return true
 }
 
-async function resolveProfile(req, { allowCreate = true } = {}) {
+export async function resolveProfile(req, { allowCreate = true } = {}) {
   const profileId = req.headers['x-profile-id']
   const syncToken = req.headers['x-profile-token']
   if (!profileId || !syncToken) {
@@ -59,7 +59,7 @@ async function resolveProfile(req, { allowCreate = true } = {}) {
   return { profileId, syncToken: existing.syncToken }
 }
 
-function setCors(res) {
+export function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader(
@@ -67,5 +67,3 @@ function setCors(res) {
     'Content-Type, x-api-key, x-profile-id, x-profile-token',
   )
 }
-
-module.exports = { getDb, checkApiKey, resolveProfile, setCors }
