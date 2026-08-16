@@ -260,17 +260,18 @@ export function useTrips() {
       if (!cloudEnabled) {
         throw new Error('Cloud non configuré')
       }
-      setSyncStatus('loading')
       try {
         const trip = await joinCloudTrip(tripId)
+        skipNextPersist.current = true
         setTrips((prev) => {
           const without = prev.filter((t) => t.id !== trip.id)
           const next = [trip, ...without]
           saveTrips(next)
           return next
         })
-        setSyncStatus('synced')
         setSyncError(null)
+        // Keep status as synced — flipping to "loading" re-triggers share bootstrap
+        setSyncStatus('synced')
         return trip.id
       } catch (err) {
         setSyncStatus('error')

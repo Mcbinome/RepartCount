@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTrips } from './hooks/useTrips'
 import { TripList } from './components/TripList'
 import { TripView } from './components/TripView'
@@ -30,26 +30,45 @@ export default function App() {
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [shareBootError, setShareBootError] = useState<string | null>(null)
+  const shareOpenedRef = useRef<string | null>(null)
+  const tripsRef = useRef(trips)
+  tripsRef.current = trips
+  const openSharedTripRef = useRef(openSharedTrip)
+  openSharedTripRef.current = openSharedTrip
   const activeTrip = trips.find((t) => t.id === activeId) ?? null
 
-  // Open shared link ?g=<tripId>
+  // Open shared link ?g=<tripId> once after cloud sync is ready
   useEffect(() => {
-    if (!cloudEnabled || syncStatus === 'loading' || syncStatus === 'idle') return
+    if (!cloudEnabled || syncStatus !== 'synced') return
 
     const sharedId = readSharedTripIdFromUrl()
-    if (!sharedId) return
-    if (activeId === sharedId && trips.some((t) => t.id === sharedId)) return
+    if (!sharedId) {
+      shareOpenedRef.current = null
+      return
+    }
+    if (shareOpenedRef.current === sharedId) return
 
     let cancelled = false
+
     ;(async () => {
       try {
-        const id = await openSharedTrip(sharedId)
+        if (tripsRef.current.some((t) => t.id === sharedId)) {
+          if (cancelled) return
+          shareOpenedRef.current = sharedId
+          setActiveId(sharedId)
+          setShareBootError(null)
+          return
+        }
+
+        const id = await openSharedTripRef.current(sharedId)
         if (cancelled) return
+        shareOpenedRef.current = id
         setActiveId(id)
         setSharedTripInUrl(id)
         setShareBootError(null)
       } catch (err) {
         if (cancelled) return
+        shareOpenedRef.current = null
         setShareBootError(
           err instanceof Error ? err.message : 'Lien de partage invalide',
         )
@@ -59,15 +78,17 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [cloudEnabled, syncStatus, openSharedTrip, activeId, trips])
+  }, [cloudEnabled, syncStatus])
 
   function openTrip(id: string) {
+    shareOpenedRef.current = id
     setActiveId(id)
     setSharedTripInUrl(id)
     setShareBootError(null)
   }
 
   function backToList() {
+    shareOpenedRef.current = null
     setActiveId(null)
     setSharedTripInUrl(null)
   }
