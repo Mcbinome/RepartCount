@@ -1,4 +1,12 @@
-import { getDb, checkApiKey, resolveProfile, setCors } from '../_db.js'
+import {
+  checkApiKey,
+  ensureTripIndexes,
+  getDb,
+  grantTripAccess,
+  resolveProfile,
+  serializeTrip,
+  setCors,
+} from '../_db.js'
 
 export default async function handler(req, res) {
   setCors(res)
@@ -11,24 +19,34 @@ export default async function handler(req, res) {
     if (!profile) return res.status(401).json({ error: 'Profile not linked' })
 
     const db = await getDb()
-    await db.collection('trips').createIndex({ ownerId: 1, tripId: 1 }, { unique: true }).catch(() => {})
+    await ensureTripIndexes(db)
 
-    const docs = await db
+    // Backfill access for trips this profile already owns
+    const owned = await db
       .collection('trips')
       .find({ ownerId: profile.profileId })
-      .sort({ updatedAt: -1 })
+      .project({ tripId: 1 })
       .toArray()
+    for (const doc of owned) {
+      await grantTripAccess(db, doc.tripId, profile.profileId, 'owner')
+    }
 
-    const trips = docs.map((d) => ({
-      id: d.tripId,
-      name: d.name,
-      participants: d.participants || [],
-      expenses: d.expenses || [],
-      createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
-      updatedAt: d.updatedAt instanceof Date ? d.updatedAt.toISOString() : d.updatedAt,
-    }))
+    const accessRows = await db
+      .collection('tripAccess')
+      .find({ profileId: profile.profileId })
+      .project({ tripId: 1 })
+      .toArray()
+    const tripIds = [...new Set(accessRows.map((row) => row.tripId))]
 
-    res.status(200).json({ trips })
+    const docs = tripIds.length
+      ? await db
+          .collection('trips')
+          .find({ tripId: { $in: tripIds } })
+          .sort({ updatedAt: -1 })
+          .toArray()
+      : []
+
+    res.status(200).json({ trips: docs.map(serializeTrip) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

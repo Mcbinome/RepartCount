@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { Expense, Participant, Trip } from '../types'
 import { downloadTripExport, parseTripImport } from '../lib/importExport'
+import { getTripShareUrl, isCloudConfigured } from '../lib/api'
 import { ParticipantsPanel } from './ParticipantsPanel'
 import { ExpensesPanel } from './ExpensesPanel'
 import { BalancesPanel } from './BalancesPanel'
@@ -40,11 +41,24 @@ export function TripView({
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const cloudEnabled = isCloudConfigured()
+  const shareUrl = getTripShareUrl(trip.id)
 
   function handleExport() {
     downloadTripExport(trip)
     setError(null)
     setNotice('Groupe exporté en fichier JSON local.')
+  }
+
+  async function handleCopyShareLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setError(null)
+      setNotice('Lien de partage copié. Toute personne avec le lien peut voir et modifier le groupe.')
+    } catch {
+      setNotice(null)
+      setError(`Copiez ce lien manuellement : ${shareUrl}`)
+    }
   }
 
   async function handleImport(file: File | null) {
@@ -109,6 +123,23 @@ export function TripView({
         )}
         <p className="brand-mini">RepartCount</p>
       </header>
+
+      {cloudEnabled && (
+        <section className="trip-tools share-tools">
+          <div>
+            <strong>Partage</strong>
+            <p>
+              Envoyez ce lien : les autres ouvrent le même groupe et peuvent
+              l&apos;éditer.
+            </p>
+          </div>
+          <div className="trip-tools-actions">
+            <button type="button" className="btn primary" onClick={() => void handleCopyShareLink()}>
+              Copier le lien
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="trip-tools">
         <div>

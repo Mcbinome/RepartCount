@@ -1,4 +1,10 @@
-import { getDb, checkApiKey, resolveProfile, setCors } from '../_db.js'
+import {
+  checkApiKey,
+  getDb,
+  profileCanAccessTrip,
+  resolveProfile,
+  setCors,
+} from '../_db.js'
 
 export default async function handler(req, res) {
   setCors(res)
@@ -14,10 +20,12 @@ export default async function handler(req, res) {
     if (!profile) return res.status(401).json({ error: 'Profile not linked' })
 
     const db = await getDb()
-    const result = await db.collection('trips').deleteOne({
-      ownerId: profile.profileId,
-      tripId: id,
-    })
+    const { trip, allowed } = await profileCanAccessTrip(db, id, profile.profileId)
+    if (!trip || !allowed) return res.status(404).json({ error: 'Not found' })
+
+    // Anyone with access can delete the shared group for everyone
+    const result = await db.collection('trips').deleteOne({ tripId: id })
+    await db.collection('tripAccess').deleteMany({ tripId: id })
 
     res.status(200).json({ deletedCount: result.deletedCount })
   } catch (err) {

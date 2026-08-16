@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import {
   deleteCloudTrip,
   isCloudConfigured,
+  joinCloudTrip,
   listCloudTrips,
   upsertCloudTrip,
 } from '../lib/api'
@@ -254,6 +255,34 @@ export function useTrips() {
     }
   }, [cloudEnabled])
 
+  const openSharedTrip = useCallback(
+    async (tripId: string) => {
+      if (!cloudEnabled) {
+        throw new Error('Cloud non configuré')
+      }
+      setSyncStatus('loading')
+      try {
+        const trip = await joinCloudTrip(tripId)
+        setTrips((prev) => {
+          const without = prev.filter((t) => t.id !== trip.id)
+          const next = [trip, ...without]
+          saveTrips(next)
+          return next
+        })
+        setSyncStatus('synced')
+        setSyncError(null)
+        return trip.id
+      } catch (err) {
+        setSyncStatus('error')
+        const message =
+          err instanceof Error ? err.message : 'Impossible d’ouvrir le lien partagé'
+        setSyncError(message)
+        throw err instanceof Error ? err : new Error(message)
+      }
+    },
+    [cloudEnabled],
+  )
+
   return {
     trips,
     syncStatus,
@@ -270,5 +299,6 @@ export function useTrips() {
     removeExpense,
     replaceTrip,
     refreshFromCloud,
+    openSharedTrip,
   }
 }

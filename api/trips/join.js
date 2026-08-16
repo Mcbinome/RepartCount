@@ -1,7 +1,9 @@
 import {
   checkApiKey,
+  ensureTripIndexes,
+  findTripById,
   getDb,
-  profileCanAccessTrip,
+  grantTripAccess,
   resolveProfile,
   serializeTrip,
   setCors,
@@ -17,12 +19,16 @@ export default async function handler(req, res) {
     const { id } = req.body || {}
     if (!id) return res.status(400).json({ error: 'id required' })
 
-    const profile = await resolveProfile(req, { allowCreate: false })
+    const profile = await resolveProfile(req)
     if (!profile) return res.status(401).json({ error: 'Profile not linked' })
 
     const db = await getDb()
-    const { trip, allowed } = await profileCanAccessTrip(db, id, profile.profileId)
-    if (!trip || !allowed) return res.status(404).json({ error: 'Not found' })
+    await ensureTripIndexes(db)
+
+    const trip = await findTripById(db, id)
+    if (!trip) return res.status(404).json({ error: 'Groupe introuvable' })
+
+    await grantTripAccess(db, id, profile.profileId, 'member')
 
     res.status(200).json({ trip: serializeTrip(trip) })
   } catch (err) {

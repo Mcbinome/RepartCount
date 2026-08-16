@@ -46,10 +46,35 @@ export async function deleteCloudTrip(id: string): Promise<void> {
   await postJson('/api/trips/delete', { id })
 }
 
+export async function joinCloudTrip(id: string): Promise<Trip> {
+  const data = await postJson<{ trip: Trip }>('/api/trips/join', { id })
+  if (!data.trip) throw new Error('Groupe introuvable')
+  return data.trip
+}
+
 export async function testCloudConnection(): Promise<{ ok: boolean; database: string }> {
   return postJson('/api/trips/test', {})
 }
 
 export function isCloudConfigured(): boolean {
   return Boolean(import.meta.env.VITE_API_KEY)
+}
+
+export function getTripShareUrl(tripId: string): string {
+  const url = new URL(window.location.origin + window.location.pathname)
+  url.searchParams.set('g', tripId)
+  return url.toString()
+}
+
+export function readSharedTripIdFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search)
+  const id = params.get('g')?.trim()
+  return id || null
+}
+
+export function setSharedTripInUrl(tripId: string | null): void {
+  const url = new URL(window.location.href)
+  if (tripId) url.searchParams.set('g', tripId)
+  else url.searchParams.delete('g')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }

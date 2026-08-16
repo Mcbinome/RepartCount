@@ -129,9 +129,7 @@ export function TripList({
                   type="button"
                   className="btn ghost danger icon"
                   aria-label={`Supprimer ${trip.name}`}
-                  onClick={() => {
-                    if (confirm(`Supprimer « ${trip.name} » ?`)) onDelete(trip.id)
-                  }}
+                  onClick={() => onDelete(trip.id)}
                 >
                   ×
                 </button>

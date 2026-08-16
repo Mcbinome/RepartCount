@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTrips } from './hooks/useTrips'
 import { TripList } from './components/TripList'
 import { TripView } from './components/TripView'
+import {
+  readSharedTripIdFromUrl,
+  setSharedTripInUrl,
+} from './lib/api'
 import './App.css'
 
 export default function App() {
@@ -21,16 +25,58 @@ export default function App() {
     removeExpense,
     replaceTrip,
     refreshFromCloud,
+    openSharedTrip,
   } = useTrips()
 
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [shareBootError, setShareBootError] = useState<string | null>(null)
   const activeTrip = trips.find((t) => t.id === activeId) ?? null
+
+  // Open shared link ?g=<tripId>
+  useEffect(() => {
+    if (!cloudEnabled || syncStatus === 'loading' || syncStatus === 'idle') return
+
+    const sharedId = readSharedTripIdFromUrl()
+    if (!sharedId) return
+    if (activeId === sharedId && trips.some((t) => t.id === sharedId)) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const id = await openSharedTrip(sharedId)
+        if (cancelled) return
+        setActiveId(id)
+        setSharedTripInUrl(id)
+        setShareBootError(null)
+      } catch (err) {
+        if (cancelled) return
+        setShareBootError(
+          err instanceof Error ? err.message : 'Lien de partage invalide',
+        )
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cloudEnabled, syncStatus, openSharedTrip, activeId, trips])
+
+  function openTrip(id: string) {
+    setActiveId(id)
+    setSharedTripInUrl(id)
+    setShareBootError(null)
+  }
+
+  function backToList() {
+    setActiveId(null)
+    setSharedTripInUrl(null)
+  }
 
   if (activeTrip) {
     return (
       <TripView
         trip={activeTrip}
-        onBack={() => setActiveId(null)}
+        onBack={backToList}
         onRename={(name) => renameTrip(activeTrip.id, name)}
         onAddParticipant={(name, shares) =>
           addParticipant(activeTrip.id, name, shares)
@@ -51,17 +97,25 @@ export default function App() {
     <TripList
       trips={trips}
       syncStatus={syncStatus}
-      syncError={syncError}
+      syncError={shareBootError || syncError}
       cloudEnabled={cloudEnabled}
       onRefresh={() => void refreshFromCloud()}
-      onOpen={setActiveId}
+      onOpen={openTrip}
       onCreate={(name) => {
         const id = createTrip(name)
-        setActiveId(id)
+        openTrip(id)
       }}
       onDelete={(id) => {
+        const trip = trips.find((t) => t.id === id)
+        if (
+          !confirm(
+            `Supprimer « ${trip?.name ?? 'ce groupe'} » pour tout le monde (y compris ceux qui ont le lien) ?`,
+          )
+        ) {
+          return
+        }
         deleteTrip(id)
-        if (activeId === id) setActiveId(null)
+        if (activeId === id) backToList()
       }}
     />
   )
