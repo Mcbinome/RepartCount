@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Expense, Trip } from '../types'
-import { expenseShareBreakdown, formatMoney } from '../lib/calculations'
+import {
+  expenseDate,
+  expenseShareBreakdown,
+  formatExpenseDate,
+  formatMoney,
+  todayDateInputValue,
+  toDateInputValue,
+} from '../lib/calculations'
 
 interface Props {
   trip: Trip
@@ -14,6 +21,7 @@ type ExpenseDraft = Omit<Expense, 'id' | 'createdAt'>
 export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(todayDateInputValue)
   const [paidBy, setPaidBy] = useState(trip.participants[0]?.id ?? '')
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(trip.participants.map((p) => p.id)),
@@ -54,6 +62,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
   function resetForm() {
     setTitle('')
     setAmount('')
+    setDate(todayDateInputValue())
     setPaidBy(trip.participants[0]?.id ?? '')
     setSelected(new Set(trip.participants.map((p) => p.id)))
     setCustomShares({})
@@ -66,6 +75,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
     setOpenId(null)
     setTitle(expense.title)
     setAmount(String(expense.amount).replace('.', ','))
+    setDate(expenseDate(expense))
     setPaidBy(expense.paidBy)
     setSelected(new Set(expense.participantIds))
 
@@ -106,6 +116,8 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
     const parsed = Number.parseFloat(amount.replace(',', '.'))
     if (!title.trim() || !Number.isFinite(parsed) || parsed <= 0) return null
     if (!paidBy || selected.size === 0) return null
+    const normalizedDate = toDateInputValue(date)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return null
 
     let shares: Record<string, number> | undefined
     if (useCustomShares) {
@@ -131,6 +143,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
       paidBy,
       participantIds: [...selected],
       shares,
+      date: normalizedDate,
     }
   }
 
@@ -146,6 +159,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
         paidBy: draft.paidBy,
         participantIds: draft.participantIds,
         shares: draft.shares,
+        date: draft.date,
       })
     } else {
       onAdd(draft)
@@ -164,6 +178,14 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
 
   const payer = (id: string) =>
     trip.participants.find((p) => p.id === id)?.name ?? '?'
+
+  const sortedExpenses = trip.expenses
+    .slice()
+    .sort(
+      (a, b) =>
+        expenseDate(b).localeCompare(expenseDate(a)) ||
+        b.createdAt.localeCompare(a.createdAt),
+    )
 
   return (
     <section className="panel">
@@ -196,6 +218,16 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0,00"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="e-date">Date</label>
+            <input
+              id="e-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
             />
           </div>
           <div className="field">
@@ -301,6 +333,7 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
             disabled={
               !title.trim() ||
               !amount ||
+              !date ||
               selected.size === 0 ||
               !paidBy ||
               (useCustomShares &&
@@ -325,11 +358,11 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
         </div>
       </form>
 
-      {trip.expenses.length === 0 ? (
+      {sortedExpenses.length === 0 ? (
         <p className="empty">Aucune dépense enregistrée.</p>
       ) : (
         <ul className="expense-list">
-          {trip.expenses.map((expense) => {
+          {sortedExpenses.map((expense) => {
             const open = openId === expense.id
             const editing = editingId === expense.id
             const breakdown = expenseShareBreakdown(expense, trip.participants)
@@ -349,7 +382,8 @@ export function ExpensesPanel({ trip, onAdd, onRemove, onUpdate }: Props) {
                       {editing ? ' · en cours de modification' : ''}
                     </strong>
                     <span className="meta">
-                      Payé par {payer(expense.paidBy)} ·{' '}
+                      {formatExpenseDate(expense)} · Payé par{' '}
+                      {payer(expense.paidBy)} ·{' '}
                       {expense.participantIds.length} personne
                       {expense.participantIds.length !== 1 ? 's' : ''}
                       {expense.shares ? ' · parts custom' : ''}

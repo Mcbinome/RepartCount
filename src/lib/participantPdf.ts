@@ -2,7 +2,9 @@ import type { Balance, Expense, Settlement, Trip } from '../types'
 import {
   computeBalances,
   computeSettlements,
+  expenseDate,
   expenseShareBreakdown,
+  formatExpenseDate,
   formatMoney,
 } from './calculations'
 
@@ -51,7 +53,11 @@ function getParticipantExpenseLines(
         paidByMe: expense.paidBy === participantId,
       }
     })
-    .sort((a, b) => a.expense.title.localeCompare(b.expense.title, 'fr'))
+    .sort((a, b) => {
+      const byDate = expenseDate(b.expense).localeCompare(expenseDate(a.expense))
+      if (byDate !== 0) return byDate
+      return a.expense.title.localeCompare(b.expense.title, 'fr')
+    })
 }
 
 function netLabel(balance: Balance): string {
@@ -188,6 +194,7 @@ async function buildParticipantPdf(trip: Trip, participantIds?: string[]) {
       doc.setFontSize(10)
       doc.setTextColor(74, 88, 84)
       const detail = [
+        formatExpenseDate(line.expense),
         `Payé par ${line.payerName}${line.paidByMe ? ' (vous)' : ''}`,
         `Votre part : ${money(line.shareAmount)} (${line.shares} part${line.shares !== 1 ? 's' : ''})`,
       ].join(' · ')

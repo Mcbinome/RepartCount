@@ -123,3 +123,51 @@ export function formatMoney(amount: number, currency = 'EUR'): string {
     maximumFractionDigits: 2,
   }).format(amount)
 }
+
+/** Normalize to YYYY-MM-DD for date inputs. */
+export function toDateInputValue(value?: string | null): string {
+  if (value && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10)
+  }
+  const d = value ? new Date(value) : new Date()
+  if (Number.isNaN(d.getTime())) {
+    const now = new Date()
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('-')
+  }
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+export function expenseDate(expense: { date?: string; createdAt: string }): string {
+  return toDateInputValue(expense.date || expense.createdAt)
+}
+
+export function formatExpenseDate(expense: {
+  date?: string
+  createdAt: string
+}): string {
+  const raw = expenseDate(expense)
+  const [y, m, d] = raw.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
+
+export function todayDateInputValue(): string {
+  const now = new Date()
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-')
+}

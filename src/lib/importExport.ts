@@ -37,6 +37,13 @@ function isExpense(value: unknown): value is Expense {
     return false
   }
 
+  if (
+    value.date !== undefined &&
+    (typeof value.date !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value.date))
+  ) {
+    return false
+  }
+
   if (value.shares === undefined) return true
   if (!isRecord(value.shares)) return false
 

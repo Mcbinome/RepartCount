@@ -18,6 +18,8 @@ export interface Expense {
    * A value of 0 means the person is not charged for this expense.
    */
   shares?: Record<string, number>
+  /** Expense date as YYYY-MM-DD (falls back to createdAt when missing). */
+  date?: string
   createdAt: string
 }
 

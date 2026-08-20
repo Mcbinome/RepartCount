@@ -7,6 +7,7 @@ import {
   listCloudTrips,
   upsertCloudTrip,
 } from '../lib/api'
+import { todayDateInputValue } from '../lib/calculations'
 import { loadTrips, saveTrips } from '../lib/storage'
 import type { Expense, Participant, Trip } from '../types'
 
@@ -183,6 +184,7 @@ export function useTrips() {
     (tripId: string, expense: Omit<Expense, 'id' | 'createdAt'>) => {
       const full: Expense = {
         ...expense,
+        date: expense.date || todayDateInputValue(),
         id: uuid(),
         createdAt: new Date().toISOString(),
       }
