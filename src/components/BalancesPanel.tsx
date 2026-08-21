@@ -18,6 +18,8 @@ export function BalancesPanel({ trip }: Props) {
   const balances = useMemo(() => computeBalances(trip), [trip])
   const settlements = useMemo(() => computeSettlements(balances), [balances])
   const total = trip.expenses.reduce((s, e) => s + e.amount, 0)
+  const averageOwed =
+    trip.participants.length > 0 ? total / trip.participants.length : 0
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -58,6 +60,14 @@ export function BalancesPanel({ trip }: Props) {
           <h2>Soldes</h2>
           <p>
             Total des dépenses&nbsp;: <strong>{formatMoney(total)}</strong>
+            {' · '}
+            Part moyenne&nbsp;:{' '}
+            <strong>{formatMoney(averageOwed)}</strong>
+            <span className="meta">
+              {' '}
+              (total ÷ {trip.participants.length} personne
+              {trip.participants.length !== 1 ? 's' : ''})
+            </span>
           </p>
         </div>
         <button
@@ -78,12 +88,31 @@ export function BalancesPanel({ trip }: Props) {
           .sort((a, b) => b.net - a.net)
           .map((b) => {
             const tone = b.net > 0.005 ? 'pos' : b.net < -0.005 ? 'neg' : 'zero'
+            const vsAverage = b.owed - averageOwed
+            const vsLabel =
+              Math.abs(vsAverage) < 0.005
+                ? 'égal à la moyenne'
+                : vsAverage > 0
+                  ? `+${formatMoney(vsAverage)} vs moyenne`
+                  : `${formatMoney(vsAverage)} vs moyenne`
             return (
               <li key={b.participantId} className={tone}>
                 <div>
                   <strong>{b.name}</strong>
                   <span className="meta">
                     A payé {formatMoney(b.paid)} · Doit {formatMoney(b.owed)}
+                    {' · '}
+                    <span
+                      className={
+                        Math.abs(vsAverage) < 0.005
+                          ? 'vs-avg zero'
+                          : vsAverage > 0
+                            ? 'vs-avg above'
+                            : 'vs-avg below'
+                      }
+                    >
+                      {vsLabel}
+                    </span>
                   </span>
                 </div>
                 <div className="balance-actions">

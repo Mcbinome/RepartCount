@@ -689,6 +689,18 @@
   color: var(--muted);
 }
 
+.vs-avg.above {
+  color: var(--warn);
+}
+
+.vs-avg.below {
+  color: var(--pos);
+}
+
+.vs-avg.zero {
+  color: var(--muted);
+}
+
 .settlements {
   margin-top: 1.5rem;
   padding-top: 1.15rem;
